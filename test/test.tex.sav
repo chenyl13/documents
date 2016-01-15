@@ -1,0 +1,158 @@
+\documentclass{template}
+\usepackage{multirow}
+\usepackage{graphicx}
+\usepackage{enumerate}
+\usepackage{appendix}
+\usepackage{float}
+\usepackage{shorttoc}
+
+\begin{document}
+\title{32位MIPS处理器实验测试文档}
+\author{SHS小组 \\ 乔奕~郭嘉丞~陈雨兰}
+\maketitle
+%\tableofcontents
+\shorttableofcontents{目录}{2}
+\newpage
+
+\section{引言}
+
+    \subsection{编写目的}
+    撰写本测试文档的目的在于，列出每一阶段的实验需求，介绍测试方案和使用的测试工具，记录遇到的问题和解决结果。
+
+    \subsection{测试方案}
+    本实验采取多轮迭代的方式进行，每次移植一部分操作系统的功能，直到成功运行完整的操作系统。在每一轮迭代中，首先对每一个模块做单元测试，然后对新增的每条mips指令进行测试，并尝试一些可能发生数据冲突的指令组合，最后用裁剪的操作系统作为测试用例，成功运行后，代表这一轮迭代完成。
+
+    本文档中，首先介绍单元测试、单指令测试和总体测试的实现方法和用到的测试工具，然后记录每一轮迭代的测试过程。
+
+\section{单元测试}
+
+    \subsection{需求}
+    验证CPU模块是否正确运行，包括输出信号和状态跳转是否正确，是否能在规定时钟周期运行完毕。
+
+    验证外设能否正确输入和输出数据，是否能在规定时钟下运行，以及中断信号是否合理。
+
+    \subsection{实现方式}
+    对每一个CPU内部模块，实现一个testbench，对每种可能的输入给定一组输入信号，检测输出信号和状态机状态是否正确。这部分主要用ISim仿真。
+
+    对于外设，先单独测试输入和输出少量数据，然后测试输入大量数据后全部输出。这部分主要用开发板测试。
+
+    \subsection{取指单元IFPhase}
+    \begin{table}[H]
+    \centering
+    \begin{tabular}{|l|l|}
+    \hline
+    测试名称 & 描述  \\
+    \hline
+    初始化 & 输入reset信号，检测输出信号初始值  \\
+    \hline
+    正常读取 & 等待一个时钟周期，检测pc自加  \\
+    \hline
+    插入气泡 & 输入插入气泡信号，检测pc修改  \\
+    \hline
+    跳转 & 输入跳转信号，检测pc跳转  \\
+    \hline
+    跳转后读取 & 等待一个时钟周期，检测跳转后自加  \\
+    \hline
+    气泡后跳转 & 输入气泡和跳转信号，检测pc跳转  \\
+    \hline
+    \end{tabular}
+    \end{table}
+
+    \subsection{指令译码单元InstDecode}
+    对实现的每一条mips指令，输入32位指令编码，检测所有输出信号是否正确。
+
+    \subsection{寄存器堆RegFile}
+    \begin{table}[H]
+    \centering
+    \begin{tabular}{|l|l|}
+    \hline
+    测试名称 & 描述  \\
+    \hline
+    写入 & 向每个寄存器写入数据  \\
+    \hline
+    读出 & 读取寄存器中的数据  \\
+    \hline
+    同时写入读出 & 读写同一寄存器，检测是否读出刚写入的值  \\
+    \hline
+    写入乘法结果 &  根据乘法标志写入乘法结果到HI、LO寄存器 \\
+    \hline
+    \end{tabular}
+    \end{table}
+
+    \subsection{算术单元alu}
+    测试用例如下，其中alu\_opcode表示不同运算，lhs和rhs表示两个操作数，result表示正常操作输出，hi\_lo表示乘除法输出，is\_hi\_lo为乘除法标志。对每个alu\_opcode，设计输入数据，检测输出信号是否正确。
+    \begin{table}[H]
+    \centering
+    \begin{tabular}{|l|l|l|l|}
+    \hline
+    测试名称 & alu\_opcode & 输入 & 输出  \\
+    \hline
+    无操作 & ALU\_NONE & 无 & result=0 \\
+    \hline
+    位运算 & ALU\_AND,ALU\_OR,ALU\_NOT,ALU\_XOR,ALU\_NOR & lhs,rhs & result \\
+    \hline
+    加减运算 & ALU\_ADD,ALU\_SUB & lhs,rhs & result  \\
+    \hline
+    移位运算 & ALU\_SLL,ALU\_SRA,ALU\_SRL & rhs,shift\_amount & result  \\
+    \hline
+    移位运算 & ALU\_SLLV,ALU\_SRLV,ALU\_SRAV & lhs,rhs & result  \\
+    \hline
+    比较运算 & ALU\_LS,ALU\_LU & lhs,rhs & result(0)  \\
+    \hline
+    乘法运算 & ALU\_MULT & lhs,rhs & result  \\
+    \hline
+    乘法运算 & ALU\_MULT\_64 & lhs,rhs & hi\_lo,is\_hi\_lo  \\
+    \hline
+    除法运算 & ALU\_DIVU & lhs,rhs & hi\_lo,is\_hi\_lo  \\
+    \hline
+    \end{tabular}
+    \end{table}
+
+    问题1：用左操作数表示移动位数的移位运算中，左操作数过大导致运算报错。
+
+    解决：取左操作数的末5位作为移动位数。
+
+    问题2：没有区分二操作数与三操作数乘法。
+
+    解决：设置不同的编号，二操作数乘法结果输出到hi\_lo，三操作数乘法取后32位输出到result。
+
+    \subsection{跳转旁路BranchByPass}
+    对每一种跳转指令，进行跳转成功和失败两次测试，检测pc设置是否正确。
+
+    \subsection{数据旁路DataByPass}
+    测试使用正常输入数据，以及上一级、上两级输入数据时，输出是否正确，以及上一级和上两级输入的优先级是否正确。
+
+    \subsection{异常处理ExceptionDecoder}
+
+\section{单条指令测试}
+    \subsection{需求}
+    检测单条指令是否能在流水线中正常运行。
+
+    \subsection{实现方式}
+    为了方便实现这部分测试，本小组设计了用于模拟ram和外设的模块。
+    mem\_stub模块用于从文件中读入指令并保存到数组中，在取指时输出相应的指令。
+    serial\_stub模块用于把原本输出到串口的数据输出到仿真软件控制台。
+
+    测试时，首先把需要测试的mips指令编译为可执行程序。然后使用本小组的make\_mem\_file工具，把可执行程序转换成每行一条32位二进制指令的文本。最后用ISim仿真，查看执行结果是否正确。
+
+\section{总体测试}
+    \subsection{需求}
+    分阶段正确运行裁剪后的操作系统。
+
+    \subsection{实现方式}
+    先对CPU整体仿真，方式参考上一章，然后用开发板测试。
+    
+    \subsection{lab inst}
+    这是一个用于单条指令和多条指令测试的lab。
+
+    \subsection{lab0}
+    lab0加载操作系统内核后
+
+    \subsection{lab1}
+
+    \subsection{lab2}
+
+
+
+
+\end{document}

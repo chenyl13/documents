@@ -41,6 +41,39 @@
     \includegraphics[width=0.5\textwidth]{CPUPic/ALU.jpg}
     \end{figure}
     
+    \begin{table}[H]
+    \centering
+    \begin{tabular}{|l|l|l|}
+    \hline
+    信号 & 描述  \\
+    \hline
+    alu_opcode &  \\
+    \hline
+    2 & EntryLo0 & 作为 TLBWI 及其他 TLB 指令接口，管理偶数页入口  \\
+    \hline
+    3 & EntryLo1 & 作为 TLBWI 及其他 TLB 指令接口，管理奇数页入口  \\
+    \hline
+    9 & BadVAddr & 捕捉最近一次地址错误或 TLB 异常时的虚拟地址  \\
+    \hline
+    10 & Count & 每隔一个时时增加 1，用作计时器，并可使能控制  \\
+    \hline
+    \multirow{2}{*}{11} & \multirow{2}{*}{EntryHi} & TLB 异常时，系统将虚拟地址部分写入 EntryHi 寄存器中用于 TLB 匹 \\
+    & & 配信息  \\
+    \hline
+    \multirow{2}{*}{12} & \multirow{2}{*}{Compare} & Compare 保持一定值，当 Count 值与 Compare 相等时，SI\_TimerInt 引 \\
+    & & 脚变高电平直到有数值写入 Compare，用于定时中断 \\
+    \hline
+    13 & Status & 表示处理器的操作模式、中断使能及诊断状态  \\
+    \hline
+    15 & Cause & 记录最近一次异常原因，控制软件中断请求和中断处理派分向量  \\
+    \hline
+    16 & EPC & 存储异常处理之后程序恢复执行的地址  \\
+    \hline
+    18 & EBase & 识别多处理器系统中不同的处理器异常向量的基地址  \\
+    \hline
+    \end{tabular}
+    \end{table}
+    
     ALU 负责双操作数的算术逻辑运算，由 ALUOp 信号和指令的 funct 字段控制，完成数据和地址的算术、逻辑、移位运算，输出结果。其中，乘法指令不通过 ALU 计算，由乘法器支持，PC + 4 运算由专门的加法器支持。
 
     为支持流水线 CPU 的正常运行，部分运算如跳转指令的地址计算不通过 ALU 。

@@ -29,57 +29,49 @@
     \subsection{需求}
     验证CPU模块是否正确运行，包括输出信号和状态跳转是否正确，是否能在规定时钟周期运行完毕。
 
-    验证外设能否正确输入和输出数据，是否能在规定时钟下运行，以及中断信号是否合理。
+    验证外设能否正确输入和输出数据，是否能在规定时钟下运行，以及状态跳转和中断信号是否合理。
 
     \subsection{实现方式}
-    对每一个CPU内部模块，实现一个testbench，对每种可能的输入给定一组输入信号，检测输出信号和状态机状态是否正确。这部分主要用ISim仿真。
+    对每一个CPU内部模块，实现一个testbench，对每种可能的输入情况给定一组输入信号，检测输出信号和状态机状态。这部分主要用ISim 仿真，用assert函数检测输出，在错误位置查看波形。
 
-    对于外设，先单独测试输入和输出少量数据，然后测试输入大量数据后全部输出。这部分主要用开发板测试。
+    对于外设，先测试正确性，单独输入和输出少量数据，然后测试稳定性，输入大量数据后全部输出。这部分主要用开发板测试，用led显示中间结果，开关控制测试过程。
 
     \subsection{取指单元IFPhase}
-    \begin{table}[H]
-    \centering
-    \begin{tabular}{|l|l|}
-    \hline
-    测试名称 & 描述  \\
-    \hline
-    初始化 & 输入reset信号，检测输出信号初始值  \\
-    \hline
-    正常读取 & 等待一个时钟周期，检测pc自加  \\
-    \hline
-    插入气泡 & 输入插入气泡信号，检测pc修改  \\
-    \hline
-    跳转 & 输入跳转信号，检测pc跳转  \\
-    \hline
-    跳转后读取 & 等待一个时钟周期，检测跳转后自加  \\
-    \hline
-    气泡后跳转 & 输入气泡和跳转信号，检测pc跳转  \\
-    \hline
-    \end{tabular}
-    \end{table}
+    \subsubsection{测试用例}
+    
+    \begin{enumerate}
+    \item 初始化 \\ 输入reset信号，检测输出信号初始值
+    \item 正常读取 \\ 等待一个时钟周期，检测pc自加（+4）
+    \item 插入气泡 \\ 输入插入气泡信号，检测pc修改
+    \item 跳转 \\ 输入跳转信号，检测pc跳转位置
+    \item 跳转后读取 \\ 跳转后，等待一个时钟周期，检测跳转后自加（+4）
+    \item 气泡后跳转 \\ 连续两个时钟周期输入气泡和跳转信号，检测pc跳转位置
+    \end{enumerate}
+    
+    \subsubsection{测试结果}
+    测试结果满足需求。
 
     \subsection{指令译码单元InstDecode}
+    \subsubsection{测试用例}
     对实现的每一条mips指令，输入32位指令编码，检测所有输出信号是否正确。
 
+    \subsubsection{测试结果}
+    发现一处alu\_opcode解码错误，在解码时错误解了操作码的定义，混淆了有符号和无符号比较，这是沟通不到位所致，修改后可以正确运行。
+
     \subsection{寄存器堆RegFile}
-    \begin{table}[H]
-    \centering
-    \begin{tabular}{|l|l|}
-    \hline
-    测试名称 & 描述  \\
-    \hline
-    写入 & 向每个寄存器写入数据  \\
-    \hline
-    读出 & 读取寄存器中的数据  \\
-    \hline
-    同时写入读出 & 读写同一寄存器，检测是否读出刚写入的值  \\
-    \hline
-    写入乘法结果 &  根据乘法标志写入乘法结果到HI、LO寄存器 \\
-    \hline
-    \end{tabular}
-    \end{table}
+    \subsubsection{测试用例}
+    \begin{enumerate}
+    \item 写入 \\ 向每个寄存器写入数据
+    \item 读出 \\ 读取寄存器中的数据
+    \item 处理数据冲突 \\ 连续读写同一寄存器，检测是否能读出刚写入的值 
+    \item 写入乘法结果，检测乘法结果冲突 \\  根据乘法标志写入乘法结果到HI、LO寄存器，检测连续的mul、mfhi、mflo指令能否正常执行
+    \end{enumerate}
+    
+    \subsubsection{测试结果}
+    在添加hi、lo寄存器后，由于同时写入两个寄存器而rd\_id无法同时表示，出现了hi寄存器数据冲突被忽略的情况，因此新增一个写入hi、lo寄存器信号。
 
     \subsection{算术单元alu}
+    \subsubsection{测试用例}
     测试用例如下，其中alu\_opcode表示不同运算，lhs和rhs表示两个操作数，result表示正常操作输出，hi\_lo表示乘除法输出，is\_hi\_lo为乘除法标志。对每个alu\_opcode，设计输入数据，检测输出信号是否正确。
     \begin{table}[H]
     \centering
@@ -89,7 +81,8 @@
     \hline
     无操作 & ALU\_NONE & 无 & result=0 \\
     \hline
-    位运算 & ALU\_AND,ALU\_OR,ALU\_NOT,ALU\_XOR,ALU\_NOR & lhs,rhs & result \\
+    \multirow{2}{*}{位运算} & ALU\_AND,ALU\_OR,ALU\_NOT,ALU\_XOR, & \multirow{2}{*}{lhs,rhs} & \multirow{2}{*}{result} \\
+     & ALU\_NOR & & \\
     \hline
     加减运算 & ALU\_ADD,ALU\_SUB & lhs,rhs & result  \\
     \hline
@@ -108,21 +101,106 @@
     \end{tabular}
     \end{table}
 
-    问题1：用左操作数表示移动位数的移位运算中，左操作数过大导致运算报错。
-
+    \subsubsection{测试结果}
+    在测试中，遇到的问题以及解决方案如下。
+    \begin{enumerate}
+    \item
+    问题：用左操作数表示移动位数的移位运算中，左操作数过大导致运算报错。\\
     解决：取左操作数的末5位作为移动位数。
-
-    问题2：没有区分二操作数与三操作数乘法。
-
+    \item
+    问题：没有区分二操作数与三操作数乘法。\\
     解决：设置不同的编号，二操作数乘法结果输出到hi\_lo，三操作数乘法取后32位输出到result。
+    \end{enumerate}
 
     \subsection{跳转旁路BranchByPass}
-    对每一种跳转指令，进行跳转成功和失败两次测试，检测pc设置是否正确。
-
+    \subsubsection{测试用例}
+    首先，对每一种跳转指令，进行跳转成功和失败两次测试，检测pc设置是否正确，其中包括：b，beq，bne，bg，bge，bl，ble，jr，j。
+    
+    然后，测试使用前三级的result时，优先级设置是否正确。
+    
+    \subsubsection{测试结果}
+    跳转测试正确。
+    
     \subsection{数据旁路DataByPass}
+    \subsubsection{测试用例}
     测试使用正常输入数据，以及上一级、上两级输入数据时，输出是否正确，以及上一级和上两级输入的优先级是否正确。
+    
+    \subsubsection{测试结果}
+    数据旁路测试正确。
 
     \subsection{异常处理ExceptionDecoder}
+    \subsubsection{测试用例}
+    \begin{enumerate}
+    \item 触发异常 \\ 对每种异常，触发异常信号，检测epc、status、cause寄存器设置，异常向量设置是否正确，是否给出了撤销流水信号。
+    \item 嵌套中断 \\ 测试嵌套中断时的状态机状态，以及中断屏蔽是否正确。设计中允许TLB作为高级中断，在其他中断过程中进入TLB\_miss处理，eret后回到原中断处理。
+    \end{enumerate}
+    
+    \subsubsection{测试结果}
+    在TLB\_miss处理结束后，eret出现两种可能的状态转移而出错，需要记录下之前的状态，判断eret之后回到用户态还是继续处于内核态。
+    
+    \subsection{快表TLB}
+    乔奕
+    \subsubsection{测试用例}
+    \begin{enumerate}
+    \item
+    \end{enumerate}
+
+    \subsubsection{测试结果}
+    在测试中，遇到的问题以及解决方案如下。
+    \begin{enumerate}
+    \item
+    问题： \\
+    解决：
+    \end{enumerate}
+    
+    \subsection{存储译码器MemDecoder}
+    \subsubsection{测试用例}
+    MemDecoder的测试与串口、sram、flash的测试共同完成。
+    
+    \subsubsection{测试结果}
+    在最初设计中，各种外设都通过总线与MemDecoder连接，但试验用的fpga芯片不支持内部的三态门。
+    因此，改为外设采用in和out两条数据线与MemDecoder连接，通过visit\_type信号判断选择哪一个输入。
+    
+    \subsection{串口}
+    
+    \subsubsection{测试用例}
+    \begin{enumerate}
+    \item 单字节输入 \\ 从PC发送一个字符，用led显示字符二进制位和状态机状态
+    \item 单字节输出 \\ 在程序中设置循环输出单字节
+    \item 回显 \\ 从PC发送一个字符，用led显示字符和状态机状态，并将原字符发送给PC
+    \item 串口中断 \\ 在状态机中检测中断信号，收到信号作上述回显操作
+    \item 状态位设置 \\ 在状态机中不断读取串口状态，一旦发现串口空闲，就输出数据
+    \item 从串口写入ram \\ reset后，从固定起始地址向ram连续写入数据，写完打开开关，从起始地址将ram数据输出到PC
+    \item 4个字节拼合 \\ 设置setup模块，缓存串口输入，每收到四次输入，将拼接好的32位数据发送给ram
+    \end{enumerate}
+    
+    \subsubsection{测试结果}
+    在测试中，遇到的问题以及解决方案如下。
+    \begin{enumerate}
+    \item
+    问题：回显测试时从第二次输入起，输出固定的错误结果。 \\
+    解决：状态机回到空闲时没有重置辅助信号，修改状态机后解决。
+    \item
+    问题：无法判断串口是否空闲。\\
+    解决：在UART模块中根据状态机状态输出writing信号，用来表示是否正在发送数据，并根据此信号变化填写状态位。
+    \end{enumerate}
+    
+    \subsection{flash}
+    乔奕
+
+    \subsubsection{测试用例}
+    \begin{enumerate}
+    \item 
+    \end{enumerate}
+
+    \subsubsection{测试结果}
+    在测试中，遇到的问题以及解决方案如下。
+    \begin{enumerate}
+    \item
+    问题： \\
+    解决：
+    \end{enumerate}
+
 
 \section{单条指令测试}
     \subsection{需求}
@@ -133,22 +211,69 @@
     mem\_stub模块用于从文件中读入指令并保存到数组中，在取指时输出相应的指令。
     serial\_stub模块用于把原本输出到串口的数据输出到仿真软件控制台。
 
-    测试时，首先把需要测试的mips指令编译为可执行程序。然后使用本小组的make\_mem\_file工具，把可执行程序转换成每行一条32位二进制指令的文本。最后用ISim仿真，查看执行结果是否正确。
+    lab inst是一个用于单条指令和多条指令测试的lab。测试时，首先把需要测试的mips指令写入，编译为可执行程序。然后使用本小组的make\_mem\_file工具，把可执行程序转换成每行一条32位二进制指令的文本。最后用ISim仿真，查看执行结果是否正确。
 
 \section{总体测试}
     \subsection{需求}
     分阶段正确运行裁剪后的操作系统。
 
     \subsection{实现方式}
-    先对CPU整体仿真，方式参考上一章，然后用开发板测试。
-    
+    先对CPU整体仿真，方式参考上一章单条指令的测试方式，然后用开发板测试。
+
     \subsection{lab0}
+    \subsubsection{测试用例}
+    lab0加载操作系统内核后，调用cons\_putc函数，输出hello world。然后从串口读入一个字符并输出。
+    
+    需要支持的指令有：nop jal jalr jr b bgtz bnez bne beqz lui li lb lw sw addiu ori andi slt move
+    
+    此外，还需完成串口输入功能。
+    
+    \subsubsection{测试结果}
+    成功输出hello world，串口读入成功。
     
     \subsection{lab1}
     
+    \subsubsection{测试用例}
+    lab1用于测试用户态。其中引入了kprintf和stdio库，并执行了一个简单的斐波那契程序。
+    
+    需要支持的指令有：slti addu sll srl subu and sra sltu lbu sb sltiu bgez negu blez beq bltz
+
+
+    \subsubsection{测试结果}
+    \paragraph{sb指令数据冲突}
+    乔奕
+
     \subsection{lab2}
+
+    \subsubsection{测试用例}
+    lab2为异常处理测试，开启了时钟中断和串口中断，并支持了TLB。每次时钟中断时，操作系统打印出当前tick的值，每次串口中断时，获取串口输入并打印。
+    
+    需要支持的指令有：mfc0 mtc0
+    
+    此外，还需添加下列cp0寄存器：sr epc cause count compare ebase
+
+    \subsubsection{测试结果}
+    \paragraph{cp0编号错误}
+    在测试时，无法正确触发时钟中断，经反复核查发现，是《实验指导文档》与32位MIPS系统规定的cp0寄存器编号不同。
+    因此，重新根据《See MIPS Run》核对了所有cp0寄存器编号。
+    \paragraph{TLB}
+    乔奕
     
     
+    \subsection{lab final}
+    
+    \subsubsection{测试用例}
+    lab final为完整的操作系统。
+
+    \subsubsection{测试结果}
+    \paragraph{未定义指令}
+    由于编译器版本不同，在测试时出现了迭代过程中指令检查工具没有查出的指令，从而导致运行出错。
+    为避免此类情形再次发生，在出现任何未定义指令时，指令解码器产生ri中断，操作系统输出错误提示并停止运行。
+    \paragraph{eret指令}
+    在eret指令中，使用的epc寄存器的值原则上也需要一个旁路进行处理。由于eret指令只在手动编写的汇编返回中出现，我们在软件中对eret前后都插入气泡。
+    \paragraph{精确异常处理} 
+    在异常处理的设计中，没有统一在哪一个阶段给出中断信号，允许异常在流水线前三级任意阶段发生，导致连续出现多个中断时，epc指示发生错误。
+    因此，一个更加合理的方案是在流水线中将异常信息统一向后传，直到ex/mem寄存器处，然后进行异常处理。
 
 
 \end{document}
